@@ -1,0 +1,3 @@
+nginx_user: www-data
+nginx_worker_processes: auto
+nginx_conf_path: /etc/nginx/conf.d

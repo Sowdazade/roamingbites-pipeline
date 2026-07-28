@@ -1,0 +1,14 @@
+--- 
+
+- hosts: servers
+  become: yes
+
+  roles:
+
+    - common
+    - docker
+    - db
+    - app
+    - drone
+      #    - firewall
+    - nginx

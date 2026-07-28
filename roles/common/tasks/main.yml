@@ -1,0 +1,14 @@
+- name: Update package cache (Debian)
+  apt:
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+
+- name: Update package cache (RedHat)
+  yum:
+    update_cache: yes
+  when: ansible_os_family == "RedHat"
+
+- name: Create directory of project
+  file:
+    path: /home/roamingbites
+    state: directory

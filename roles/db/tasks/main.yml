@@ -1,0 +1,52 @@
+- name: Create db directory
+  file: 
+    path: /home/roamingbites/db
+    state: directory
+
+- name: Create PostgreSQL directory structure
+  file:
+    path: "/home/roamingbites/db/{{ item }}"
+    state: directory
+    owner: 999
+    group: 999
+    mode: '0755'
+  loop:
+    - postgres/primary/init
+    - postgres/primary/backup
+    - postgres/primary/logs
+    - postgres/replica/init
+    - postgres/replica/backup
+    - postgres/replica/logs
+    - postgres/backup-scripts
+    - postgres/backup-logs
+
+- name: Create db docker compose 
+  copy:
+    src: docker-compose.yml
+    dest: /home/roamingbites/db/docker-compose.yml
+
+- name: Run db
+  community.docker.docker_compose_v2:
+    project_src: /home/roamingbites/db
+    state: present
+  register: compose_result
+
+- name: Create initial config for primary PostgreSQL
+  copy:
+    src: 01-init-primary.sh
+    dest: /home/roamingbites/db/postgres/primary/init
+    mode: '0755'
+
+- name: Run init config of primary PostgreSQL
+  command: bash /home/roamingbites/db/postgres/primary/init/01-init-primary.sh
+  when: compose_result.changed
+
+- name: Create initial config for replica PostgreSQL
+  copy:
+    src: 01-init-replica.sh
+    dest: /home/roamingbites/db/postgres/replica/init
+    mode: '0755'
+
+- name: Run init config of replica PostgreSQL
+  command: bash /home/roamingbites/db/postgres/replica/init/01-init-replica.sh
+  when: compose_result.changed

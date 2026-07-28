@@ -1,0 +1,30 @@
+services:
+  drone:
+    container_name: drone-server
+    image: drone/drone:2
+    ports:
+      - "3001:80"
+      - "3002:443"
+    restart: always
+    environment:
+      - DRONE_GITHUB_CLIENT_ID=Ov23liKaIhrXQCzEYUNg
+      - DRONE_GITHUB_CLIENT_SECRET=2a8fa69cb0fe70c1f0adff310e43eda7abf75ac1
+      - DRONE_RPC_SECRET=1d0822dbbf41318f699cecbfc8b7e202
+      - DRONE_SERVER_HOST=drone.sowdazade.ir
+      - DRONE_SERVER_PROTO=https 
+    volumes:
+      - "./_data:/data"
+
+  drone-runner:
+    container_name: drone-runner
+    image: drone/drone-runner-docker
+    ports:
+      - "3003:3000"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+      - DRONE_RPC_PROTO=https
+      - DRONE_RPC_HOST=drone.sowdazade.ir
+      - DRONE_RPC_SECRET=1d0822dbbf41318f699cecbfc8b7e202
+      - DRONE_RUNNER_CAPACITY=2
+      - DRONE_RUNNER_NAME=roamingbites-runner

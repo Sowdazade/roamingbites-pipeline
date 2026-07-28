@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+
+from flask import Flask, jsonify, render_template_string
+import re
+
+app = Flask(__name__)
+
+HTML_TEMPLATE = '''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>RoamingBites Locator</title>
+</head>
+<body>
+    <h1>RoamingBites Locator</h1>
+    <ul>
+        <li><a href="/health">Health Check</a></li>
+        <li><a href="/trucks">Truck List</a></li>
+        <li><a href="/reset">Reset Data</a></li>
+    </ul>
+</body>
+</html>'''
+
+TRUCKS = [
+    {"id": 1, "name": "Taco Loco", "cuisine": "Mexican", "lat": 40.7128, "lng": -74.0060},
+    {"id": 2, "name": "Burger Bus", "cuisine": "American", "lat": 40.7138, "lng": -74.0070},
+    {"id": 3, "name": "Sushi on Wheels", "cuisine": "Japanese", "lat": 40.7148, "lng": -74.0080},
+    {"id": 4, "name": "Pizza Truck", "cuisine": "Italian", "lat": 40.7158, "lng": -74.0090},
+    {"id": 5, "name": "Falafel Fan", "cuisine": "Middle Eastern", "lat": 40.7168, "lng": -74.0100}
+]
+
+@app.route('/')
+def index():
+    return render_template_string(HTML_TEMPLATE)
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "ok"}), 200
+
+@app.route('/trucks')
+def trucks():
+    return jsonify(TRUCKS)
+
+@app.route('/reset')
+def reset():
+    global TRUCKS
+    TRUCKS = [
+        {"id": 1, "name": "Taco Loco", "cuisine": "Mexican", "lat": 40.7128, "lng": -74.0060},
+        {"id": 2, "name": "Burger Bus", "cuisine": "American", "lat": 40.7138, "lng": -74.0070},
+        {"id": 3, "name": "Sushi on Wheels", "cuisine": "Japanese", "lat": 40.7148, "lng": -74.0080},
+        {"id": 4, "name": "Pizza Truck", "cuisine": "Italian", "lat": 40.7158, "lng": -74.0090},
+        {"id": 5, "name": "Falafel Fan", "cuisine": "Middle Eastern", "lat": 40.7168, "lng": -74.0100}
+    ]
+    return jsonify({"status": "reset"})
+
+if __name__ == '__main__':
+    # No file-based logging to avoid permission errors
+    import sys
+    app.run(host='0.0.0.0', port=5000, debug=False)

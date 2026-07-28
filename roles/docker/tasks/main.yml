@@ -1,0 +1,96 @@
+- name: Check if docker is installed
+  command: docker --version
+  register: docker_check
+  ignore_errors: yes
+  changed_when: false
+
+- name: Install dependencies (Debian)
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
+    update_cache: yes
+  when: docker_check.rc != 0 and ansible_os_family == "Debian"
+
+- name: Add Docker GPG key (Debian)
+  apt_key:
+    url: https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg
+    state: present
+  when: docker_check.rc != 0 and ansible_os_family == "Debian"
+
+- name: Add Docker repository (Debian)
+  apt_repository:
+    repo: "deb https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+    state: present
+  when: docker_check.rc != 0 and ansible_os_family == "Debian"
+
+- name: Install Docker (Debian)
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+  when: docker_check.rc != 0 and ansible_os_family == "Debian"
+
+
+- name: Install dependencies (RedHat)
+  yum:
+    name:
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+    state: present
+  when: docker_check.rc != 0 and ansible_os_family == "RedHat"
+
+- name: Add Docker repo (RedHat)
+  command: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+  when: docker_check.rc != 0 and ansible_os_family == "RedHat"
+
+- name: Install Docker (RedHat)
+  yum:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+  when: docker_check.rc != 0 and ansible_os_family == "RedHat"
+
+- name: Ensure docker service is started and enabled
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Add users to docker group
+  user:
+    name: "{{ item }}"
+    groups: docker
+    append: yes
+  loop: "{{ docker_users }}"
+  notify: Restart docker
+
+- name: Verify docker is working
+  command: docker info
+  register: docker_info
+  changed_when: false
+
+- name: Install python docker SDK
+  apt:
+    name: python3-pip
+    state: present
+    update_cache: yes
+
+- name: Install docker python package
+  pip:
+    name: docker
+    executable: pip3

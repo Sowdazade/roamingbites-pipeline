@@ -1,0 +1,302 @@
+services:
+
+  postgres_primary:
+    image: postgres:16-alpine
+    container_name: postgres_primary
+    hostname: postgres_primary
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: StrongPass123
+      POSTGRES_DB: myapp
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ReplicaPass123
+
+      POSTGRES_SHARED_BUFFERS: "256MB"
+      POSTGRES_MAX_CONNECTIONS: "200"
+      POSTGRES_WORK_MEM: "16MB"
+      POSTGRES_MAINTENANCE_WORK_MEM: "128MB"
+
+      TZ: "Asia/Tehran"
+
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./postgres/primary/init:/docker-entrypoint-initdb.d:ro
+      - ./postgres/primary/backup:/backup
+      - ./postgres/primary/logs:/var/log/postgresql
+    ports:
+      - "5432:5432"
+    networks:
+      - postgres_cluster
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d myapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: |
+      -c wal_level=replica
+      -c hot_standby=on
+      -c max_wal_senders=10
+      -c max_replication_slots=10
+      -c listen_addresses='*'
+      -c hot_standby_feedback=on
+      -c wal_log_hints=on
+      -c archive_mode=on
+      -c archive_command='cp %p /var/lib/postgresql/data/archive/%f'
+      -c archive_timeout=60s
+      -c shared_buffers=256MB
+      -c max_connections=200
+      -c log_connections=on
+      -c log_disconnections=on
+      -c log_replication_commands=on
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres_replica:
+    image: postgres:16-alpine
+    container_name: postgres_replica
+    hostname: postgres_replica
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: StrongPass123
+      POSTGRES_DB: myapp
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ReplicaPass123
+
+      POSTGRES_SHARED_BUFFERS: "256MB"
+      POSTGRES_MAX_CONNECTIONS: "200"
+
+      TZ: "Asia/Tehran"
+
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+      - ./postgres/replica/init:/docker-entrypoint-initdb.d:ro
+      - ./postgres/replica/backup:/backup
+      - ./postgres/replica/logs:/var/log/postgresql
+    ports:
+      - "5433:5432"
+    networks:
+      - postgres_cluster
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d myapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: |
+      -c wal_level=replica
+      -c hot_standby=on
+      -c max_wal_senders=10
+      -c max_replication_slots=10
+      -c listen_addresses='*'
+      -c hot_standby_feedback=on
+      -c wal_log_hints=on
+      -c archive_mode=on
+      -c archive_command='cp %p /var/lib/postgresql/data/archive/%f'
+      -c archive_timeout=60s
+      -c shared_buffers=256MB
+      -c max_connections=200
+      -c primary_conninfo='host=postgres_primary port=5432 user=replicator password=ReplicaPass123'
+      -c restore_command='cp /var/lib/postgresql/data/archive/%f %p'
+      -c log_connections=on
+      -c log_disconnections=on
+      -c log_replication_commands=on
+    depends_on:
+      postgres_primary:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: pgbouncer
+    hostname: pgbouncer
+    environment:
+      DATABASE_URL: postgres://admin:StrongPass123@postgres_primary:5432/myapp
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 20
+      MIN_POOL_SIZE: 5
+      RESERVE_POOL_SIZE: 10
+      RESERVE_POOL_TIMEOUT: 5
+      MAX_DB_CONNECTIONS: 100
+      MAX_USER_CONNECTIONS: 100
+      SERVER_IDLE_TIMEOUT: 600
+      QUERY_TIMEOUT: 300
+      QUERY_WAIT_TIMEOUT: 300
+      CLIENT_IDLE_TIMEOUT: 600
+      CLIENT_LOGIN_TIMEOUT: 60
+      AUTH_TYPE: md5
+      AUTH_USER: admin
+    ports:
+      - "6432:5432"
+    networks:
+      - postgres_cluster
+    restart: unless-stopped
+    depends_on:
+      postgres_primary:
+        condition: service_healthy
+      postgres_replica:
+        condition: service_healthy
+
+  minio1:
+    image: minio/minio:RELEASE.2024-12-13T22-19-12Z-cpuv1
+    container_name: minio1
+    hostname: minio1
+    command: server http://minio{1...4}/data{1...2} --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: StrongPass123
+      MINIO_ADDRESS: ':9000'
+      MINIO_CONSOLE_ADDRESS: ':9001'
+      MINIO_BROWSER_REDIRECT_URL: 'https://minio.sowdazade.ir/ui'
+      MINIO_SERVER_URL: 'https://minio.sowdazade.ir'
+    volumes:
+      - ./minio-data/data1-1:/data1
+      - ./minio-data/data1-2:/data2
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    networks:
+      - minio_cluster
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  minio2:
+    image: minio/minio:RELEASE.2024-12-13T22-19-12Z-cpuv1
+    container_name: minio2
+    hostname: minio2
+    command: server http://minio{1...4}/data{1...2} --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: StrongPass123
+      MINIO_ADDRESS: ':9000'
+      MINIO_CONSOLE_ADDRESS: ':9001'
+      MINIO_BROWSER_REDIRECT_URL: 'https://minio.sowdazade.ir/ui'
+      MINIO_SERVER_URL: 'https://minio.sowdazade.ir'
+    volumes:
+      - ./minio-data/data2-1:/data1
+      - ./minio-data/data2-2:/data2
+    ports:
+      - "9002:9001"
+      - "9003:9000"
+    networks:
+      - minio_cluster
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  minio3:
+    image: minio/minio:RELEASE.2024-12-13T22-19-12Z-cpuv1
+    container_name: minio3
+    hostname: minio3
+    command: server http://minio{1...4}/data{1...2} --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: StrongPass123
+      MINIO_ADDRESS: ':9000'
+      MINIO_CONSOLE_ADDRESS: ':9001'
+      MINIO_BROWSER_REDIRECT_URL: 'https://minio.sowdazade.ir/ui'
+      MINIO_SERVER_URL: 'https://minio.sowdazade.ir'
+    volumes:
+      - ./minio-data/data3-1:/data1
+      - ./minio-data/data3-2:/data2
+    ports:
+      - "9004:9001"
+      - "9005:9000"
+    networks:
+      - minio_cluster
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  minio4:
+    image: minio/minio:RELEASE.2024-12-13T22-19-12Z-cpuv1
+    container_name: minio4
+    hostname: minio4
+    command: server http://minio{1...4}/data{1...2} --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: StrongPass123
+      MINIO_ADDRESS: ':9000'
+      MINIO_CONSOLE_ADDRESS: ':9001'
+      MINIO_BROWSER_REDIRECT_URL: 'https://minio.sowdazade.ir/ui'
+      MINIO_SERVER_URL: 'https://minio.sowdazade.ir'
+    volumes:
+      - ./minio-data/data4-1:/data1
+      - ./minio-data/data4-2:/data2
+    ports:
+      - "9006:9001"
+      - "9007:9000"
+    networks:
+      - minio_cluster
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  mc:
+    image: minio/mc:latest
+    container_name: minio_client
+    entrypoint: |
+      sh -c "
+      sleep 15 &&
+      mc alias set local http://minio1:9000 admin StrongPass123 &&
+      mc mb local/roamingbites 2>/dev/null || true &&
+      mc policy set public local/roamingbites &&
+      for folder in temp processed original thumbnails approved rejected backup; do
+        echo '#' | mc pipe local/roamingbites/\$folder/ 2>/dev/null || true
+        mc rm local/roamingbites/\$folder/# 2>/dev/null || true
+      done &&
+      tail -f /dev/null
+      "
+    networks:
+      - minio_cluster
+    depends_on:
+      - minio1
+      - minio2
+      - minio3
+      - minio4
+
+volumes:
+
+  postgres_primary_data:
+    driver: local
+  postgres_replica_data:
+    driver: local
+  postgres_backup:
+    driver: local
+
+networks:
+
+  minio_cluster:
+    driver: bridge
+  postgres_cluster:
+    driver: bridge

@@ -1,0 +1,8 @@
+- name: Create rules of firewall
+  copy:
+    src: iptables-rules.sh
+    dest: /home/foodtrucks/iptables.sh
+    mode: 0755
+
+- name: Run bash script of firewall rules
+  command: bash /home/foodtrucks/iptables.sh

@@ -1,0 +1,49 @@
+- name: Check if nginx is installed
+  command: nginx -v 
+  register: nginx_check
+  ignore_errors: yes 
+  changed_when: false
+
+- name: Install nginx if not presents (Debian/Ubuntu)
+  apt: 
+    name: nginx
+    state: present
+    update_cache: yes
+  when: nginx_check.rc != 0 and ansible_os_family == "Debian"
+
+- name: Install nginx if not present (RHEL/CentOS)
+  yum:
+    name: nginx
+    state: present
+  when: nginx_check.rc != 0 and ansible_os_family == "RedHat"
+
+- name: Ensure nginx is enabled and started
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: Copy nginx config files
+  template:
+    src: "{{ item }}.j2"
+    dest: "{{ nginx_conf_path }}/{{ item }}"
+    owner: root
+    group: root 
+    mode: '0644'
+  loop:
+    - drone.conf
+    - minio.conf
+    - roamingbites.conf
+  notify: Reload nginx
+
+- name: Test nginx configuration
+  command: nginx -t
+  register: nginx_test
+  changed_when: false
+  failed_when: nginx_test.rc != 0
+
+- name: Reload nginx if config is valid
+  service:
+    name: nginx
+    state: reloaded
+  when: nginx_test.rc == 0

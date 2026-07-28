@@ -1,0 +1,8 @@
+docker_user:
+  - root
+
+domain: sowdazade.ir
+mail: behnam89bahrami@gmail.com
+drone_domain: drone.sowdazade.ir
+minio_domain: minio.sowdazade.ir
+app_domain: roamingbites.sowdazade.ir

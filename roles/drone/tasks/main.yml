@@ -1,0 +1,14 @@
+- name: Create drone directory
+  file:
+    path: /home/roamingbites/drone
+    state: directory
+
+- name: Create drone docker compose
+  copy:
+    src: .
+    dest: /home/roamingbites/drone
+
+- name: Run drone
+  command: docker compose up -d
+  args:
+    chdir: /home/roamingbites/drone

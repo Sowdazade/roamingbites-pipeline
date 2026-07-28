@@ -1,0 +1,14 @@
+- name: Create app directory
+  file:
+    path: /home/roamingbites/app
+    state: directory
+
+- name: Create app docker compose
+  copy:
+    src: .
+    dest: /home/roamingbites/app
+
+- name: Run app
+  command: docker compose up -d --build
+  args:
+    chdir: /home/roamingbites/app
