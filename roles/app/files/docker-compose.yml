@@ -1,7 +1,7 @@
 
 services:
   roamingbites:
-    build: .
+    image: ${APP_IMAGE}
     container_name: roamingbites
     hostname: roamingbites
     environment:
@@ -14,7 +14,7 @@ services:
       MINIO_ENDPOINT: http://minio1:9000
       MINIO_ACCESS_KEY: admin
       MINIO_SECRET_KEY: StrongPass123
-      MINIO_BUCKET: food-photos
+      MINIO_BUCKET: roamingbites
       
       APP_PORT: 5000
       APP_DEBUG: "False"

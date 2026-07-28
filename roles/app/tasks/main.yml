@@ -8,7 +8,12 @@
     src: .
     dest: /home/roamingbites/app
 
+- name: Create app docker image
+  command: docker build -t app-roamingbites:latest .
+  args:
+    chdir: /home/roamingbites/app
+
 - name: Run app
-  command: docker compose up -d --build
+  command: docker compose up -d
   args:
     chdir: /home/roamingbites/app

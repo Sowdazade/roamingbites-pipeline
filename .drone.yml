@@ -2,136 +2,41 @@ kind: pipeline
 type: docker
 name: roamingbites-pipeline
 
+
 trigger:
   branch:
     - main
-    - develop
-
-matrix:
-  PYTHON_VERSION:
-    - 3.11
-    - 3.12
+  event:
+    - push
 
 steps:
-  - name: lint
-    image: python:3.12-slim
-    commands:
-      - pip install flake8
-      - flake8 app.html --ignore=E501
-    when:
-      event: [push, pull_request]
-
-  - name: test
-    image: python:${PYTHON_VERSION}-slim
-    commands:
-      - pip install flask pytest
-      - # run simple test: check /health endpoint using curl? but we need to start the app first. Better to use a test script.
-      - python -c "import requests; import subprocess; import time; p=subprocess.Popen(['python','app.html']); time.sleep(2); r=requests.get('http://localhost:5000/health'); assert r.json()['status']=='ok'; p.terminate()"
-    depends_on: [lint]
-    when:
-      event: [push, pull_request]
-
-  - name: security
-    image: python:${PYTHON_VERSION}-slim
-    commands:
-      - pip install bandit
-      - bandit -r . -ll
-    depends_on: [lint]
-    when:
-      event: [push, pull_request]
-
-  - name: build
-    image: docker:dind
-    privileged: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    commands:
-      - docker build -t localhost:5000/roamingbites:${DRONE_COMMIT_SHA} .
-      - docker build -t localhost:5000/roamingbites:latest .
-    depends_on: [test, security]  # wait for both parallel steps
-    when:
-      event: [push]
-
-  - name: publish
-    image: docker:dind
-    privileged: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    commands:
-      - docker push localhost:5000/roamingbites:${DRONE_COMMIT_SHA}
-      - docker push localhost:5000/roamingbites:latest
-    depends_on: [build]
-    when:
-      branch: [main, develop]
-      event: [push]
-
-  - name: health-check-plugin
-    image: plugins/health-checker:latest   # this is our custom plugin
+  - name: build and push application to repository
+    image: plugins/docker:21.3
     settings:
-      url: http://app:5000/health
-      expected_status: 200
-    depends_on: [publish]
-    when:
-      event: [push]
-      branch: [main, develop]
+      context: ./roles/app/files/
+      dockerfile: ./roles/app/files/Dockerfile
+      insecure: true
+      registry: harbor.sowdazade.ir
+      username: admin
+      password:
+        from_secret: repo_pass
+      repo: harbor.sowdazade.ir/roamingbites/app-roamingbites
+      tags: production-${DRONE_COMMIT_SHA:0:8}
 
-  - name: approval
-    image: drone/drone-cli:v1
-    commands:
-      - drone build approve ${DRONE_REPO_NAMESPACE}/${DRONE_REPO_NAME} ${DRONE_BUILD_NUMBER}
-    depends_on: [publish]
-    when:
-      branch: main
-      event: push
+  - name: Update Docker Compose
+    image: appleboy/drone-ssh
+    settings:
+      host:
+        - 141.11.21.165
+      username: root
+      password:
+        from_secret: server_pass
+      port: 22
+      command_timeout: 1m
+      envs:
+        - DRONE_COMMIT_SHA
+      script:
+        - cd /home/roamingbites/app/
+        - echo -e APP_IMAGE="harbor.sowdazade.ir/roamingbites/app-roamingbites:production-${DRONE_COMMIT_SHA:0:8}" > .env
+        - docker compose up -d 
 
-  - name: deploy
-    image: williamyeh/ansible:ubuntu20.04
-    commands:
-      - apt-get update && apt-get install -y sshpass
-      - ansible-playbook -i inventory.ini deploy.yml --extra-vars "app_image=localhost:5000/roamingbites:${DRONE_COMMIT_SHA}"
-    depends_on: [approval]
-    when:
-      branch: main
-      event: push
-
-  - name: tag-release
-    image: alpine/git
-    commands:
-      - git config --global user.email "drone@roamingbites.local"
-      - git config --global user.name "Drone CI"
-      - git tag -a v${DRONE_BUILD_NUMBER} -m "Release ${DRONE_BUILD_NUMBER}"
-      - git push --tags
-    depends_on: [deploy]
-    when:
-      branch: main
-      event: push
-
-  - name: notify-failure
-    image: curlimages/curl
-    commands:
-      - curl -X POST -d '{"status":"failed","build":${DRONE_BUILD_NUMBER}}' http://webhook-listener:8080/alert
-    when:
-      status: failure
-
-
----
-kind: pipeline
-type: docker
-name: cron-backup
-
-trigger:
-  cron:
-    - backup-every-6h
-
-steps:
-  - name: backup
-    image: postgres:16-alpine
-    environment:
-      PGPASSWORD: {{ secret.DB_PASSWORD }}
-    commands:
-      - pg_dump -h postgres -U roaming -d roamingbites > /tmp/backup.sql
-      - apt-get update && apt-get install -y curl
-      - curl -o /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
-      - chmod +x /usr/local/bin/mc
-      - mc alias set minio http://minio:9000 {{ secret.MINIO_ACCESS_KEY }} {{ secret.MINIO_SECRET_KEY }}
-      - mc cp /tmp/backup.sql minio/backups/roamingbites_$(date +%Y%m%d_%H%M%S).sql
