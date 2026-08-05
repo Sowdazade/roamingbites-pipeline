@@ -23,10 +23,11 @@ steps:
 
   - name: lint
     image: python:3.12-slim
-    context: ./roles/app/files/
-    commands:
-      - pip install flake8
-      - flake8 app.html --ignore=E501
+    settings:
+      context: ./roles/app/files/
+      commands:
+        - pip install flake8
+        - flake8 app.html --ignore=E501
     when:
       event: [push, pull_request]
 
