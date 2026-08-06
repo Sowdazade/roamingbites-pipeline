@@ -60,6 +60,7 @@ steps:
         - docker compose up -d 
     depends_on: [push]
 
+
   - name: tag-release
     image: alpine/git
     commands:
