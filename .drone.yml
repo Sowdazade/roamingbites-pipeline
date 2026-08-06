@@ -57,6 +57,6 @@ steps:
       script:
         - cd /home/roamingbites/app/
         - echo -e APP_IMAGE="harbor.sowdazade.ir/roamingbites/app-roamingbites:production-${DRONE_COMMIT_SHA:0:8}" > .env
-        - docker compose up -d
-      depends_on: [push] 
+        - docker compose up -d 
+    depends_on: [push] 
 
