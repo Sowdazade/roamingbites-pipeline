@@ -68,7 +68,7 @@ steps:
       - echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
       - chmod 600 ~/.ssh/id_rsa
       - ssh-keyscan -H github.com >> ~/.ssh/known_hosts
-      - git remote set-url origin git@github.com:Sowdazade/roamingbites-pipeline.git
+      - git remote set-url origin https://github.com/Sowdazade/roamingbites-pipeline.git
       - git config --global user.email "behnam89bahrami@gmail.com"
       - git config --global user.name "Sowdazade"
       - git tag -a v${DRONE_BUILD_NUMBER} -m "Release ${DRONE_BUILD_NUMBER}"
