@@ -60,3 +60,11 @@ steps:
         - docker compose up -d 
     depends_on: [push] 
 
+  - name: tag-release
+    image: alpine/git
+    commands:
+      - git config --global user.email "behnam89bahrami@gmail.com"
+      - git config --global user.name "Sowdazade"
+      - git tag -a v${DRONE_BUILD_NUMBER} -m "Release ${DRONE_BUILD_NUMBER}"
+      - git push --tags
+    depends_on: [deploy]
