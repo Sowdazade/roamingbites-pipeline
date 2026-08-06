@@ -29,7 +29,7 @@ steps:
         - python -c "import requests; import subprocess; import time; p=subprocess.Popen(['python','app.html']); time.sleep(2); r=requests.get('https://roamingbites.sowdazade.ir/'); assert r.json()['status']=='ok'; p.terminate()"
     depends_on: [lint]
 
-  - name: build and push 
+  - name: push 
     image: plugins/docker:21.3
     settings:
       context: ./roles/app/files/
@@ -57,5 +57,6 @@ steps:
       script:
         - cd /home/roamingbites/app/
         - echo -e APP_IMAGE="harbor.sowdazade.ir/roamingbites/app-roamingbites:production-${DRONE_COMMIT_SHA:0:8}" > .env
-        - docker compose up -d 
+        - docker compose up -d
+      depends_on: [push] 
 
