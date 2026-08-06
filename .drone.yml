@@ -58,13 +58,22 @@ steps:
         - cd /home/roamingbites/app/
         - echo -e APP_IMAGE="harbor.sowdazade.ir/roamingbites/app-roamingbites:production-${DRONE_COMMIT_SHA:0:8}" > .env
         - docker compose up -d 
-    depends_on: [push] 
+    depends_on: [push]
 
   - name: tag-release
     image: alpine/git
     commands:
+      - apk add --no-cache openssh-client
+      - mkdir -p ~/.ssh
+      - echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
+      - chmod 600 ~/.ssh/id_rsa
+      - ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+      - git remote set-url origin git@github.com:Sowdazade/roamingbites-pipeline.git
       - git config --global user.email "behnam89bahrami@gmail.com"
       - git config --global user.name "Sowdazade"
       - git tag -a v${DRONE_BUILD_NUMBER} -m "Release ${DRONE_BUILD_NUMBER}"
       - git push --tags
+    environment:
+      SSH_PRIVATE_KEY:
+        from_secret: ssh_private_key
     depends_on: [deploy]
